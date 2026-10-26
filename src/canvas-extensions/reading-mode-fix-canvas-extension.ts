@@ -9,6 +9,7 @@ import CanvasExtension from './canvas-extension'
  * - The transformation is applied every time the renderer receives text, instead of only once after
  *   the first render. Before, it was lost as soon as a node was edited once.
  * - Text containing the vertical spaces is never saved back to the node / file.
+ * - An empty last line (text ending with a line break) gets a vertical space as well, like the editor shows it.
  */
 
 const VERTICAL_SPACE = '<span class="vertical-space">&nbsp;</span>'
@@ -76,20 +77,29 @@ export default class ReadingModeFixCanvasExtension extends CanvasExtension {
   }
 
   static removeVerticalSpaces(text: string): string {
-    return text.replaceAll(`${VERTICAL_SPACE}\n`, '\n')
+    const cleanText = text.replaceAll(`${VERTICAL_SPACE}\n`, '\n')
+
+    // [LLM agent change] The empty last line (text ending with a line break) gets a vertical space
+    // that isn't followed by a line break, see addVerticalSpaces()
+    return cleanText.endsWith(`\n${VERTICAL_SPACE}`) ? cleanText.slice(0, -VERTICAL_SPACE.length) : cleanText
   }
 
   /**
    * [LLM agent change] Appends a vertical space to every line that is followed by a line break,
    * except for lines where markdown syntax doesn't allow inline HTML. The line count is kept,
    * so line numbers (e.g. MarkdownPostProcessorContext.getSectionInfo) still match the source.
+   *
+   * [LLM agent change] If the text ends with a line break, the editor shows an empty last line,
+   * but markdown drops it. It gets a vertical space too, so the reading view has the same height.
    */
   static addVerticalSpaces(text: string): string {
     const lines = text.split('\n')
     const skippedLines = ReadingModeFixCanvasExtension.getLinesWithoutVerticalSpace(lines)
+    const lastLine = lines.length - 1
+    const hasEmptyLastLine = lastLine > 0 && lines[lastLine] === ''
 
     return lines.map((line, i) =>
-      i < lines.length - 1 && !skippedLines.has(i) ? line + VERTICAL_SPACE : line
+      (i < lastLine || hasEmptyLastLine) && !skippedLines.has(i) ? line + VERTICAL_SPACE : line
     ).join('\n')
   }
 

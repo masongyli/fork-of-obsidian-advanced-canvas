@@ -25,6 +25,14 @@
     margin-top: 24px;
   }
 
+  /* code blocks */
+  /* [LLM agent change] Empty lines around a code block are already rendered as vertical spaces. Without this,
+     the browser's default pre margin (and e.g. Codeblock Customizer's margin-top) adds extra space on top. */
+  .el-pre > pre {
+    margin-top: 0px;
+    margin-bottom: 0px;
+  }
+
   /* number lists */
   ol::before {
     margin-left: -2px;

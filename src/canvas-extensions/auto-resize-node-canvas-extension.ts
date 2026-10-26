@@ -87,6 +87,8 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
     if (!this.isValidNodeType(node.getData())) return
     if (!this.canBeResized(node)) return
 
+    this.stopObservingRenderedContent(node)
+
     await sleep(10)
 
     if (editing) {
@@ -94,12 +96,55 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
       return
     }
 
-    const renderedMarkdownContainer = node.nodeEl.querySelector(".markdown-preview-view.markdown-rendered") as HTMLElement
-    if (!renderedMarkdownContainer) return
+    this.observeRenderedContent(node)
+  }
 
-    renderedMarkdownContainer.setCssStyles({ height: "min-content" })
-    const newHeight = renderedMarkdownContainer.clientHeight
-    renderedMarkdownContainer.setCssStyles({ height: "" })
+  /*
+   * [LLM agent change] Measuring the reading view once, 10ms after editing ended, often measured the old content:
+   * - setIsEditing(false) is called at the start of blur(), the new text is passed to the preview renderer afterwards
+   * - renderer.set() only queues the render, it runs later (next animation frame)
+   * - Post processors can change the content afterwards as well (e.g. Codeblock Customizer adds its header async)
+   * The node kept the height of the old content until the next setIsEditing(false) call (e.g. clicking the node again).
+   * Now the size of the rendered content is observed for a short time after editing ended. Only for a short time,
+   * so later layout changes (e.g. zoomed out / unloaded node content) don't change the node height.
+   */
+  private static readonly RENDERED_CONTENT_OBSERVE_DURATION = 1000 // ms
+  private renderedContentObservers = new WeakMap<CanvasNode, () => void>()
+
+  private observeRenderedContent(node: CanvasNode) {
+    const container = node.nodeEl.querySelector<HTMLElement>(".markdown-preview-view.markdown-rendered")
+    if (!container) return
+
+    const content = container.querySelector<HTMLElement>(".markdown-preview-sizer") ?? container
+    const observer = new ResizeObserver(() => this.resizeToRenderedContent(node, container))
+
+    const timeout = window.setTimeout(() => this.stopObservingRenderedContent(node), AutoResizeNodeCanvasExtension.RENDERED_CONTENT_OBSERVE_DURATION)
+    this.renderedContentObservers.set(node, () => {
+      observer.disconnect()
+      window.clearTimeout(timeout)
+    })
+
+    // Fires once initially as well
+    observer.observe(content)
+  }
+
+  private stopObservingRenderedContent(node: CanvasNode) {
+    this.renderedContentObservers.get(node)?.()
+    this.renderedContentObservers.delete(node)
+  }
+
+  private resizeToRenderedContent(node: CanvasNode, container: HTMLElement) {
+    if (node.isEditing || !this.renderedContentObservers.has(node)) return
+
+    // Don't measure the old content while a render is pending
+    if (node.child.previewMode?.renderer?.queued) {
+      window.requestAnimationFrame(() => this.resizeToRenderedContent(node, container))
+      return
+    }
+
+    container.setCssStyles({ height: "min-content" })
+    const newHeight = container.clientHeight
+    container.setCssStyles({ height: "" })
 
     this.setNodeHeight(node, newHeight)
   }

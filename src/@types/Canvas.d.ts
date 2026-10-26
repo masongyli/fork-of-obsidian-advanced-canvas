@@ -89,6 +89,7 @@ export interface CanvasElement {
       renderer?: {
         text?: string
         set: (text: string) => void
+        queued?: unknown // [LLM agent change] Set while a render is pending (set() only queues the render), used by the auto resize
 
         onRendered: (cb: () => void) => void
       }

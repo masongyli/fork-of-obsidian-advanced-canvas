@@ -83,6 +83,7 @@ export interface CanvasElement {
 
   child: {
     data: string
+    save?: (text: string, ...args: unknown[]) => void // [LLM agent change] used by the reading mode fix
 
     previewMode ?: {
       renderer?: {

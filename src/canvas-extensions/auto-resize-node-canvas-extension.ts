@@ -142,8 +142,17 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
       return
     }
 
+    // [LLM agent change] The sizer is a flex item with "flex: 1 0 0px" and the renderer sets its min-height to the
+    // sum of the section heights - 1px. With a min-content container, the sizer got exactly that min-height,
+    // so the measured height was 1px less than the content (and than the editor's height -> the node height
+    // changed by 1px when switching between reading and editing view). With flex-basis auto, the sizer is at
+    // least as tall as its content, the min-height still covers sections that aren't in the DOM (virtual display).
+    const sizer = container.querySelector<HTMLElement>(".markdown-preview-sizer")
+
     container.setCssStyles({ height: "min-content" })
+    sizer?.setCssStyles({ flexBasis: "auto" })
     const newHeight = container.clientHeight
+    sizer?.setCssStyles({ flexBasis: "" })
     container.setCssStyles({ height: "" })
 
     this.setNodeHeight(node, newHeight)

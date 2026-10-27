@@ -161,9 +161,16 @@ export default class ReadingModeFixCanvasExtension extends CanvasExtension {
 
         for (let row = i - 1; row <= end; row++) skipped.add(row)
 
-        // Keep the empty lines around the table empty, a vertical space line would be merged into the table
+        // Keep the empty line above the table empty
         if (i - 2 >= 0 && lines[i - 2].trim() === '') skipped.add(i - 2)
-        if (end + 1 < lines.length) skipped.add(end + 1)
+
+        // [LLM agent change] The empty line below the table gets a vertical space like any other empty line.
+        // Skipping it made the reading view one line shorter than the editor, which shows the empty line.
+        // A vertical space line isn't merged into the table: the reading view ends a table at the first
+        // line without a pipe, so it becomes a paragraph (together with the following lines).
+        // If another table follows, the line is the empty line above that table and is skipped there.
+        // Lines with blockquote/callout markers (e.g. ">") are still skipped, as before.
+        if (end + 1 < lines.length && lines[end + 1].trim() !== '') skipped.add(end + 1)
 
         i = end + 1
         continue

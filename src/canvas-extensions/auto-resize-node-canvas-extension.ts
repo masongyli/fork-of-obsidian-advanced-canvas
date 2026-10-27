@@ -26,8 +26,18 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
 
     this.plugin.registerEvent(this.plugin.app.workspace.on(
       'advanced-canvas:node-text-content-changed',
-      (canvas: Canvas, node: CanvasNode, viewUpdate: ViewUpdate) => void this.onNodeTextContentChanged(canvas, node, viewUpdate.view.dom)
+      (canvas: Canvas, node: CanvasNode, viewUpdate: ViewUpdate) => void this.onNodeTextContentChanged(canvas, node, AutoResizeNodeCanvasExtension.getNodeEditorDom(node, viewUpdate))
     ))
+  }
+
+  /*
+   * [LLM agent change] In live preview, every table cell is a nested editor that has the same editorInfoField
+   * as the node's editor, so typing in a table cell triggers node-text-content-changed with the cell's view.
+   * Measuring that view's .cm-scroller (one table cell, one line high) shrank the node to the minimum height.
+   * Always measure the node's own editor. Its layout already contains the updated cell.
+   */
+  private static getNodeEditorDom(node: CanvasNode, viewUpdate: ViewUpdate): HTMLElement {
+    return node.child?.editMode?.cm?.dom ?? viewUpdate.view.dom
   }
 
   private isValidNodeType(nodeData: CanvasNodeData) {
